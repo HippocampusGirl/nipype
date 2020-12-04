@@ -26,11 +26,7 @@ from .misc import is_container
 
 fmlogger = logging.getLogger("nipype.utils")
 
-related_filetype_sets = [
-    (".hdr", ".img", ".mat"),
-    (".nii", ".mat"),
-    (".BRIK", ".HEAD"),
-]
+related_filetype_sets = [(".hdr", ".img", ".mat"), (".nii", ".mat"), (".BRIK", ".HEAD")]
 
 
 def _resolve_with_filenotfound(path, **kwargs):
@@ -439,7 +435,7 @@ def copyfile(
             fmlogger.debug("Copying File: %s->%s", newfile, originalfile)
             shutil.copyfile(originalfile, newfile)
         except shutil.Error as e:
-            fmlogger.warning(e.message)
+            fmlogger.warning(str(e))
 
     # Associated files
     if copy_related_files:
@@ -870,15 +866,13 @@ def get_dependencies(name, environ):
         o, e = proc.communicate()
         deps = o.rstrip()
     except Exception as ex:
-        deps = '"%s" failed' % command
-        fmlogger.warning(
-            "Could not get dependencies of %s. Error:\n%s", name, ex.message
-        )
+        deps = f'{command!r} failed'
+        fmlogger.warning(f"Could not get dependencies of {name}s. Error:\n{ex}")
     return deps
 
 
 def canonicalize_env(env):
-    """Windows requires that environment be dicts with bytes as keys and values
+    """Windows requires that environment be dicts with str as keys and values
     This function converts any unicode entries for Windows only, returning the
     dictionary untouched in other environments.
 
@@ -890,7 +884,7 @@ def canonicalize_env(env):
     Returns
     -------
     env : dict
-        Windows: environment dictionary with bytes keys and values
+        Windows: environment dictionary with str keys and values
         Other: untouched input ``env``
     """
     if os.name != "nt":
@@ -898,10 +892,10 @@ def canonicalize_env(env):
 
     out_env = {}
     for key, val in env.items():
-        if not isinstance(key, bytes):
-            key = key.encode("utf-8")
-        if not isinstance(val, bytes):
-            val = val.encode("utf-8")
+        if not isinstance(key, str):
+            key = key.decode("utf-8")
+        if not isinstance(val, str):
+            val = val.decode("utf-8")
         out_env[key] = val
     return out_env
 
