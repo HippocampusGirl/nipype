@@ -52,6 +52,7 @@ _build_main_image_py36: &build_main_image_py36
         --rm=false \
         --tag nipype/nipype:latest \
         --tag nipype/nipype:py36 \
+        $(test -z "${CIRCLE_TAG}" || echo --tag nipype/nipype:"${CIRCLE_TAG}") \
         --build-arg BUILD_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
         --build-arg VCS_REF="$(git rev-parse --short HEAD)" \
         --build-arg VERSION="${CIRCLE_TAG}" /home/circleci/nipype
@@ -192,6 +193,7 @@ jobs:
             docker push nipype/nipype:base
             docker push nipype/nipype:latest
             docker push nipype/nipype:py36
+            test -z "${CIRCLE_TAG}" || docker push nipype/nipype:"${CIRCLE_TAG}"
       - run:
           name: Move pruned Dockerfile to /tmp/docker/cache directory
           command: |
@@ -201,61 +203,6 @@ jobs:
           paths:
             - /tmp/docker/cache/Dockerfile.base-pruned
           key: dockerfile-cache-v1-{{ .Branch }}-{{ checksum "/tmp/docker/cache/Dockerfile.base-pruned" }}
-
-  pypi_precheck:
-    machine: *machine_kwds
-    working_directory: /home/circleci/nipype
-    steps:
-      - checkout:
-          path: /home/circleci/nipype
-      - run:
-          name: Check pypi preconditions
-          command: |
-            pyenv local 3.6.5
-            pip install --upgrade pip twine future wheel readme_renderer setuptools
-            python setup.py sdist bdist_wheel
-            twine check dist/*
-      - run:
-          name: Validate Python 3 installation
-          command: |
-            pyenv local 3.6.5
-            pip install --upgrade pip
-            pip install dist/nipype-*-py3-none-any.whl
-      - run:
-          name: Validate Python 3.7 installation
-          command: |
-            pyenv local 3.7.0
-            pip install --upgrade pip
-            # Pre-install a version of numpy that will not pass
-            pip install numpy==1.15.0
-            pip install dist/nipype-*-py3-none-any.whl
-            # Numpy should be upgraded to >= 1.15.3
-            test "$(pip show numpy | grep Version)" \> "Version: 1.15.2"
-      - run:
-          name: Check python_requires prevents installation on Python 3.3
-          command: |
-            pyenv install 3.3.7
-            pyenv local 3.3.7
-            FAIL=false
-            pip install dist/nipype-*-py2.py3-none-any.whl || FAIL=true
-            $FAIL
-      - store_artifacts:
-          path: /home/circleci/nipype/dist
-
-  deploy_pypi:
-    machine: *machine_kwds
-    working_directory: /home/circleci/nipype
-    steps:
-      - checkout:
-          path: /home/circleci/nipype
-      - run:
-          name: Deploy to PyPI
-          command: |
-            pyenv local 3.6.5
-            pip install --upgrade twine wheel readme_renderer setuptools
-            python setup.py check -r -s
-            python setup.py sdist bdist_wheel
-            twine upload dist/*
 
   update_feedstock:
     machine: *machine_kwds
@@ -289,50 +236,10 @@ jobs:
               ssh-add ~/.ssh/id_ed25519
               /home/circleci/nipype/tools/feedstock.sh
 
-  build_docs:
-    docker:
-      - image: python:3.7.4
-    working_directory: /tmp/src/nipype
-    environment:
-      - FSLOUTPUTTYPE: 'NIFTI'
-    steps:
-      - checkout
-      - run:
-          name: Check Python version and upgrade pip
-          command: |
-            python --version
-            python -m pip install -U pip
-      - run:
-          name: Install graphviz
-          command: |
-              apt-get update
-              apt-get install -y graphviz
-      - run:
-          name: Install Requirements (may contain pinned versions)
-          command: python -m pip install -r doc/requirements.txt
-      - run:
-          name: Install NiPype
-          command: python -m pip install ".[doc]"
-      - run:
-          name: Build documentation
-          command: make -C doc html
-      - store_artifacts:
-          path: /tmp/src/nipype/doc/_build/html
-
 workflows:
   version: 2
   build_test_deploy:
     jobs:
-      - build_docs:
-          filters:
-            tags:
-              only: /.*/
-      - pypi_precheck:
-          filters:
-            branches:
-              only: /(rel|dev)\/.*/
-            tags:
-              only: /.*/
       - compare_base_dockerfiles:
           filters:
             branches:
@@ -353,21 +260,14 @@ workflows:
           filters:
             branches:
               only: master
-          requires:
-            - test_pytest
-      - deploy_pypi:
-          filters:
-            branches:
-              ignore: /.*/
             tags:
               only: /.*/
           requires:
-            - pypi_precheck
             - test_pytest
       - update_feedstock:
           context: nipybot
           filters:
             branches:
-              only: /rel\/.*/
+              only: /rel\/\d.*/
             tags:
               only: /.*/

@@ -5,7 +5,7 @@ docs.  In setup.py in particular, we exec this file, so it cannot import nipy
 
 # nipype version information
 # Remove -dev for release
-__version__ = "1.6.0"
+__version__ = "1.6.1"
 
 
 def get_nipype_gitversion():
@@ -162,7 +162,7 @@ TESTS_REQUIRES = [
 EXTRA_REQUIRES = {
     "data": ["datalad"],
     "doc": [
-        "dipy",
+        "dipy!=1.4.1",
         "ipython",
         "matplotlib",
         "nbsphinx",
@@ -172,7 +172,7 @@ EXTRA_REQUIRES = {
         "sphinxcontrib-napoleon",
     ],
     "duecredit": ["duecredit"],
-    "nipy": ["nitime", "nilearn", "dipy", "nipy", "matplotlib"],
+    "nipy": ["nitime", "nilearn", "dipy!=1.4.1", "nipy", "matplotlib"],
     "profiler": ["psutil>=5.0"],
     "pybids": ["pybids>=0.7.0"],
     "specs": ["black"],
